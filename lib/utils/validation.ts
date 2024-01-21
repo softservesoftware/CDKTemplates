@@ -1,6 +1,9 @@
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as z from "zod";
 
+// @TODO: add handling nullable types
+// @TODO: add references to Zod documentation
+
 export const convertZodSchemaToApiGatewayModel = <T extends Record<string, z.ZodSchema>>(
   schema: z.ZodObject<T>,
 ): apigateway.JsonSchema => {
@@ -29,8 +32,13 @@ export const convertZodSchemaToApiGatewayModel = <T extends Record<string, z.Zod
 
   function convertObjectToSchema(schema: z.ZodObject<Record<string, any>>): apigateway.JsonSchema {
     const properties: { [key: string]: apigateway.JsonSchema } = {};
+    const required: string[] = [];
 
     for (const [key, value] of Object.entries(schema.shape)) {
+      if (!(value as z.ZodSchema).isOptional()) {
+        required.push(key);
+      }
+
       if (value instanceof z.ZodUnion) {
         properties[key] = {
           oneOf: value.options.map(convertScalarOrObjectTypeToSchema),
@@ -51,6 +59,7 @@ export const convertZodSchemaToApiGatewayModel = <T extends Record<string, z.Zod
       schema: apigateway.JsonSchemaVersion.DRAFT4,
       type: apigateway.JsonSchemaType.OBJECT,
       properties,
+      required,
     };
   }
 

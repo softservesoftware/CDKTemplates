@@ -169,6 +169,7 @@ export class RestApiConstruct extends Construct {
             requestValidatorOptions: {
               requestValidatorName: createNameFromPath(fullPath, "RequestValidator"),
               validateRequestBody: true,
+              // @TODO: add ability to disable validation of path and query string params
               validateRequestParameters: true,
             },
             requestParameters: {
