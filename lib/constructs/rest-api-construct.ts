@@ -4,22 +4,22 @@ import {
   LambdaIntegration,
   LambdaIntegrationOptions,
   Model,
-  RestApi,
+  RestApi
 } from "aws-cdk-lib/aws-apigateway";
-import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import { Construct } from "constructs";
+import { z } from "zod";
 import {
-  ApiParams,
   ApiHttpResourceKeys,
-  ApiResourceDefinition,
   ApiHttpResourceParams,
-  ApiResourceParams,
+  ApiParams,
   ApiProxyResourceParams,
+  ApiResourceDefinition,
   ApiResourceIntegrationDefinition,
   ApiResourceLambdaDefinition,
+  ApiResourceParams,
 } from "../types";
 import { convertZodSchemaToApiGatewayModel } from "../utils/validation";
-import { z } from "zod";
 
 const getPathSegmentsFromFullPath = (fullPath: string): string[] =>
   fullPath
@@ -87,9 +87,9 @@ const getIntegrationFromResourceDefinition = (
 const isProxyResourceDef = (value: ApiResourceParams): value is ApiProxyResourceParams =>
   "proxy" in value && Boolean(value.proxy);
 
-const toPascalCase = (str: string): string => str[0].toUpperCase() + str.slice(1);
+const toPascalCase = (str: string): string => str[0].toUpperCase() + str.slice(1).toLowerCase();
 
-const endpointPathToAlphanumericName = (path: string): string =>
+const stringToAlphanumericName = (path: string): string =>
   path
     .replace(/[^a-zA-Z0-9]/g, "-")
     .split("-")
@@ -97,8 +97,10 @@ const endpointPathToAlphanumericName = (path: string): string =>
     .map(toPascalCase)
     .join("");
 
-const createNameFromPath = (path: string, name: string): string =>
-  `${endpointPathToAlphanumericName(path)}${toPascalCase(name)}`;
+const buildNamespacedNameCreator =
+  (options: { path: string; method: string }) =>
+  (name: string): string =>
+    [options.method, options.path, name].map(stringToAlphanumericName).join("");
 
 export class RestApiConstruct extends Construct {
   public readonly api: RestApi;
@@ -108,7 +110,16 @@ export class RestApiConstruct extends Construct {
 
     // @TODO: add namespace usage
     // @TODO: add necessary API params like deployment stage, etc.
-    const restApi = new RestApi(this, "RestApi");
+    const restApi = new RestApi(this, "RestApi", {
+      restApiName: id,
+      deployOptions: {
+        stageName: "dev",
+      },
+      retainDeployments: true,
+      // defaultMethodOptions: {
+      //   authorizer: params.globalParams?.auth,
+      // }
+    });
 
     this.api = restApi;
 
@@ -151,6 +162,8 @@ export class RestApiConstruct extends Construct {
             continue;
           }
 
+          const createName = buildNamespacedNameCreator({ path: fullPath, method });
+
           const requestParamsQueryStringParamsDef =
             "queryParams" in methodDef && methodDef.queryParams
               ? Object.fromEntries(
@@ -165,9 +178,14 @@ export class RestApiConstruct extends Construct {
           const integration = getIntegrationFromResourceDefinition(methodDef, {
             pathParams,
           });
-          leafResource.addMethod("POST", integration, {
+          
+          if (params.globalParams?.cors) {
+            leafResource.addCorsPreflight(params.globalParams.cors);
+          }
+
+          leafResource.addMethod(method.toUpperCase(), integration, {
             requestValidatorOptions: {
-              requestValidatorName: createNameFromPath(fullPath, "RequestValidator"),
+              requestValidatorName: createName("Request-Validator"),
               validateRequestBody: true,
               // @TODO: add ability to disable validation of path and query string params
               validateRequestParameters: true,
@@ -179,10 +197,7 @@ export class RestApiConstruct extends Construct {
             requestModels:
               "request" in methodDef && methodDef.request
                 ? {
-                    "application/json": this.addModelFromZodSchema(
-                      createNameFromPath(fullPath, "RequestModel"),
-                      methodDef.request,
-                    ),
+                    "application/json": this.addModelFromZodSchema(createName("Request-Model"), methodDef.request),
                   }
                 : undefined,
             methodResponses:
@@ -193,10 +208,7 @@ export class RestApiConstruct extends Construct {
                   ).map((response) => ({
                     statusCode: String(response.statusCode),
                     responseModels: {
-                      "application/json": this.addModelFromZodSchema(
-                        createNameFromPath(fullPath, "ResponseModel"),
-                        response.schema,
-                      ),
+                      "application/json": this.addModelFromZodSchema(createName("Response-Model"), response.schema),
                     },
                   }))
                 : undefined,
@@ -209,6 +221,7 @@ export class RestApiConstruct extends Construct {
   protected addModelFromZodSchema(name: string, schema: z.ZodObject<any>): Model {
     return this.api.addModel(name, {
       modelName: name,
+      contentType: "application/json",
       schema: convertZodSchemaToApiGatewayModel(schema),
     });
   }

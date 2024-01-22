@@ -1,9 +1,9 @@
 import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
-import { RestApiConstruct } from "./constructs/rest-api-construct";
-import { LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
+import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import { Construct } from "constructs";
 import { z } from "zod";
+import { RestApiConstruct } from "./constructs/rest-api-construct";
 
 /**
  * @TODO:
@@ -15,7 +15,7 @@ import { z } from "zod";
  *     - add authorizers
  *     - add rate limiting and throttling
  * - add global params
- *    - add global cors
+ *    - [x] add global cors
  *    - add global authorizers
  *    - add integration timeout specification
  * - add deployments and stages
@@ -34,16 +34,29 @@ export class CdkTemplatesStack extends cdk.Stack {
       handler: "index.handler",
     });
 
+    // @TODO: add throtling and rate limiting as global params
+    // @TODO: do we need to add API versioning among global params?
+    // @TODO: ensure possible injections isolation at the parameters parsing stage
+
+    // @TODO: in addition to the API the documentation deployer construct might be created
     const api = new RestApiConstruct(this, "RestApi", {
+      globalParams: {
+        cors: {
+          allowOrigins: apigateway.Cors.ALL_ORIGINS,
+          allowMethods: apigateway.Cors.ALL_METHODS,
+          allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+          allowCredentials: true,
+        },
+      },
       paths: {
         "/lambda/base": {
-          get: new LambdaIntegration(fooBarLambda),
+          get: new apigateway.LambdaIntegration(fooBarLambda),
         },
         "/proxy/base": {
-          proxy: new LambdaIntegration(fooBarLambda),
+          proxy: new apigateway.LambdaIntegration(fooBarLambda),
         },
         "/lambda/params/{paramId}": {
-          get: {
+          post: {
             function: fooBarLambda,
             queryParams: {
               someQueryParam: true,
@@ -57,6 +70,7 @@ export class CdkTemplatesStack extends cdk.Stack {
                   type: z.union([z.literal("admin"), z.literal("user")]),
                 }),
               ),
+              // @TODO: unions are not properly exported to swagger
               payload: z.union([
                 z.object({ type: z.literal("payload_type_A"), value: z.string() }),
                 z.object({ type: z.literal("payload_type_B"), value: z.number() }),
