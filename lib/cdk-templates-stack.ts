@@ -4,6 +4,8 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
 import { z } from "zod";
 import { RestApiConstruct } from "./constructs/rest-api-construct";
+import { UiConstruct } from "./constructs/ui-construct";
+import { DomainConstruct } from "./constructs/domain-construct";
 
 /**
  * @TODO:
@@ -26,6 +28,22 @@ import { RestApiConstruct } from "./constructs/rest-api-construct";
 export class CdkTemplatesStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // Domain construct -
+    // the following will create a hosted zone and a certificate for the domain
+    const domain = new DomainConstruct(this, "Domain", {
+      domain: "my-domain.com",
+    });
+
+    // UI Construct -
+    // the following will create a static site in S3 and a CloudFront distribution,
+    // it requires a full domain name, a certificate and a build path for the static site
+    const ui = new UiConstruct(this, "Ui",{
+      cert: domain.wildcardCert,
+      domain: "my-domain.com",
+      zone: domain.zone,
+      buildPath: "path/to/build",
+    });
 
     const fooBarLambda = new lambda.Function(this, "MyFunction", {
       functionName: "FooBar",
@@ -83,5 +101,7 @@ export class CdkTemplatesStack extends cdk.Stack {
         },
       },
     });
+
+    
   }
 }
