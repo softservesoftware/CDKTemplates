@@ -1,9 +1,11 @@
 import * as cdk from "aws-cdk-lib";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
 import { z } from "zod";
 import { RestApiConstruct } from "./constructs/rest-api-construct";
+import { DynamoConstruct } from "./constructs/dynamo/dynamo-construct";
 
 /**
  * @TODO:
@@ -26,6 +28,22 @@ import { RestApiConstruct } from "./constructs/rest-api-construct";
 export class CdkTemplatesStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // dyamo db construct
+    const dynamo = new DynamoConstruct(this, "Dynamo", {
+      tableName: "MyTable",
+      partitionKey: {
+        name: "exampple_id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "example_sort",
+        type: dynamodb.AttributeType.STRING,
+      },
+      systemLogLevel: lambda.SystemLogLevel.INFO,
+      applicationLogLevel: lambda.ApplicationLogLevel.INFO,
+    });
+
 
     const fooBarLambda = new lambda.Function(this, "MyFunction", {
       functionName: "FooBar",
