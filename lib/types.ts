@@ -3,11 +3,12 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import { z } from "zod";
 
 export type AuthParams = {
-  email: boolean;
-  //   google: {
-  //     clientId: string;
-  //     clientSecret: string;
-  //   };
+  signUpEnabled: boolean;
+  email?: boolean;
+  google?: {
+    clientId: string;
+    clientSecret: string;
+  };
   //   facebook: {};
   //   oidc: {}; // Auth0, Okta, etc.
   //   passwordless: {}; // SMS, email, etc.
@@ -25,7 +26,9 @@ export type ApiResourceAuthParamsHost = {
   responses: z.ZodObject<any> | { statusCode: number; schema: z.ZodObject<any> }[];
 };
 
-export type WithOptionalResourceAuthParams<T> = T & Partial<ApiResourceAuthParamsHost>;
+export type WithOptionalResourceAuthParams<T> = T &
+  Partial<ApiResourceAuthParamsHost> &
+  Pick<apigateway.MethodOptions, "authorizationScopes">;
 
 export type ApiResourceLambdaDefinition = WithOptionalResourceAuthParams<
   apigateway.LambdaIntegrationOptions & { function: lambda.IFunction; queryParams?: Record<string, boolean> }
@@ -48,7 +51,7 @@ export type ApiResourceParams = Partial<ApiHttpResourceParams> | Partial<ApiProx
 
 export type ApiParams = {
   globalParams?: Partial<{
-    auth: ApiResourceAuthParams;
+    auth: apigateway.Authorizer;
     cors: apigateway.CorsOptions;
     // @TODO: add global transformers for parsing query string, URL params and body
   }>;

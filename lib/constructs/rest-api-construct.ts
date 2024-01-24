@@ -1,10 +1,12 @@
 import {
+  Authorizer,
   IResource,
   Integration,
   LambdaIntegration,
   LambdaIntegrationOptions,
+  MethodOptions,
   Model,
-  RestApi
+  RestApi,
 } from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
@@ -174,14 +176,14 @@ export class RestApiConstruct extends Construct {
                 )
               : {};
 
+          if (params.globalParams?.cors) {
+            leafResource.addCorsPreflight(params.globalParams.cors);
+          }
+
           // @TODO: add authorizer creation
           const integration = getIntegrationFromResourceDefinition(methodDef, {
             pathParams,
           });
-          
-          if (params.globalParams?.cors) {
-            leafResource.addCorsPreflight(params.globalParams.cors);
-          }
 
           leafResource.addMethod(method.toUpperCase(), integration, {
             requestValidatorOptions: {
@@ -212,6 +214,11 @@ export class RestApiConstruct extends Construct {
                     },
                   }))
                 : undefined,
+
+            ...this.createMethodAuthDef({
+              globalAuthorizer: params.globalParams?.auth,
+              methodDef,
+            }),
           });
         }
       }
@@ -219,10 +226,44 @@ export class RestApiConstruct extends Construct {
   }
 
   protected addModelFromZodSchema(name: string, schema: z.ZodObject<any>): Model {
+    // console.log(JSON.stringify(zodToJsonSchema(schema), null, 2));
+
+    const jsonSchema = convertZodSchemaToApiGatewayModel(schema);
+
+    // console.log(JSON.stringify(jsonSchema, null, 2));
+
     return this.api.addModel(name, {
       modelName: name,
       contentType: "application/json",
-      schema: convertZodSchemaToApiGatewayModel(schema),
+      schema: jsonSchema,
+      // schema: zodToJsonSchema(schema) as JsonSchema,
     });
+  }
+
+  protected createMethodAuthDef(params: {
+    globalAuthorizer: Authorizer | undefined;
+    methodDef: ApiResourceDefinition;
+  }): Pick<MethodOptions, 'authorizer' | 'authorizationScopes'> | null {
+    if (params.methodDef instanceof Integration) {
+      return {
+        authorizer: params.globalAuthorizer,
+      };
+    }
+
+    const isAuthDisabled = params.methodDef.auth === false;
+    if (isAuthDisabled) {
+      return null;
+    }
+
+    let authorizer: Authorizer | undefined = params.globalAuthorizer;
+
+    if (params.methodDef.auth && typeof params.methodDef.auth === "object") {
+      authorizer = params.methodDef.auth;
+    }
+
+    return {
+      authorizer,
+      authorizationScopes: params.methodDef.authorizationScopes,
+    };
   }
 }
