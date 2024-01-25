@@ -1,12 +1,13 @@
 import * as cdk from "aws-cdk-lib";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
 import { z } from "zod";
 import { RestApiConstruct } from "./constructs/rest-api-construct";
 import { UiConstruct } from "./constructs/ui-construct";
 import { DomainConstruct } from "./constructs/domain-construct";
-
+import { DynamoConstruct } from "./constructs/dynamo/dynamo-construct";
 /**
  * @TODO:
  * - add endpoints specification with various integrations
@@ -29,21 +30,21 @@ export class CdkTemplatesStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Domain construct -
-    // the following will create a hosted zone and a certificate for the domain
-    const domain = new DomainConstruct(this, "Domain", {
-      domain: "my-domain.com",
+    // dyamo db construct
+    const dynamo = new DynamoConstruct(this, "Dynamo", {
+      tableName: "MyTable",
+      partitionKey: {
+        name: "exampple_id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "example_sort",
+        type: dynamodb.AttributeType.STRING,
+      },
+      systemLogLevel: lambda.SystemLogLevel.INFO,
+      applicationLogLevel: lambda.ApplicationLogLevel.INFO,
     });
 
-    // UI Construct -
-    // the following will create a static site in S3 and a CloudFront distribution,
-    // it requires a full domain name, a certificate and a build path for the static site
-    const ui = new UiConstruct(this, "Ui",{
-      cert: domain.wildcardCert,
-      domain: "my-domain.com",
-      zone: domain.zone,
-      buildPath: "path/to/build",
-    });
 
     const fooBarLambda = new lambda.Function(this, "MyFunction", {
       functionName: "FooBar",
