@@ -54,3 +54,5 @@ export type ApiParams = {
   }>;
   paths: Record<string, ApiResourceParams>;
 };
+
+

@@ -5,8 +5,9 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
 import { z } from "zod";
 import { RestApiConstruct } from "./constructs/rest-api-construct";
+import { UiConstruct } from "./constructs/ui-construct";
+import { DomainConstruct } from "./constructs/domain-construct";
 import { DynamoConstruct } from "./constructs/dynamo/dynamo-construct";
-
 /**
  * @TODO:
  * - add endpoints specification with various integrations
@@ -101,5 +102,7 @@ export class CdkTemplatesStack extends cdk.Stack {
         },
       },
     });
+
+    
   }
 }
